@@ -16,9 +16,11 @@
 package com.proofpoint.discovery;
 
 import com.google.common.base.Objects;
+import com.proofpoint.discovery.monitor.MonitorWith;
 import com.proofpoint.node.NodeInfo;
 
 import javax.inject.Inject;
+import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.PUT;
@@ -29,6 +31,8 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.UriInfo;
 
+import static com.proofpoint.discovery.monitor.DiscoveryEventType.DYNAMICANNOUNCEMENT;
+import static com.proofpoint.discovery.monitor.DiscoveryEventType.DYNAMICANNOUNCEMENTDELETE;
 import static java.lang.String.format;
 import static javax.ws.rs.core.Response.Status.ACCEPTED;
 import static javax.ws.rs.core.Response.Status.BAD_REQUEST;
@@ -49,7 +53,8 @@ public class DynamicAnnouncementResource
 
     @PUT
     @Consumes(MediaType.APPLICATION_JSON)
-    public Response put(@PathParam("node_id") Id<Node> nodeId, @Context UriInfo uriInfo, DynamicAnnouncement announcement)
+    @MonitorWith(DYNAMICANNOUNCEMENT)
+    public Response put(@Context HttpServletRequest httpServletRequest, @Context UriInfo uriInfo, final DynamicAnnouncement announcement, @PathParam("node_id") final Id<Node> nodeId)
     {
         if (!nodeInfo.getEnvironment().equals(announcement.getEnvironment())) {
             return Response.status(BAD_REQUEST)
@@ -69,7 +74,8 @@ public class DynamicAnnouncementResource
     }
 
     @DELETE
-    public Response delete(@PathParam("node_id") Id<Node> nodeId)
+    @MonitorWith(DYNAMICANNOUNCEMENTDELETE)
+    public Response delete(@Context HttpServletRequest httpServletRequest, @Context UriInfo uriInfo, @PathParam("node_id") final Id<Node> nodeId)
     {
         if (!dynamicStore.delete(nodeId)) {
             return Response.status(NOT_FOUND).build();

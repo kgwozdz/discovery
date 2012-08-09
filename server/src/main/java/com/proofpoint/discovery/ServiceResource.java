@@ -16,15 +16,20 @@
 package com.proofpoint.discovery;
 
 import com.google.inject.Inject;
+import com.proofpoint.discovery.monitor.MonitorWith;
 import com.proofpoint.node.NodeInfo;
 
+import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
+import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.UriInfo;
 
 import static com.google.common.collect.Sets.union;
+import static com.proofpoint.discovery.monitor.DiscoveryEventType.SERVICEQUERY;
 
 
 @Path("/v1/service")
@@ -45,7 +50,8 @@ public class ServiceResource
     @GET
     @Path("{type}/{pool}")
     @Produces(MediaType.APPLICATION_JSON)
-    public Services getServices(@PathParam("type") String type, @PathParam("pool") String pool)
+    @MonitorWith(SERVICEQUERY)
+    public Services getServices(@Context HttpServletRequest httpServletRequest, @Context UriInfo uriInfo, @PathParam("type") final String type, @PathParam("pool") final String pool)
     {
         return new Services(node.getEnvironment(), union(dynamicStore.get(type, pool), staticStore.get(type, pool)));
     }
@@ -53,14 +59,16 @@ public class ServiceResource
     @GET
     @Path("{type}")
     @Produces(MediaType.APPLICATION_JSON)
-    public Services getServices(@PathParam("type") String type)
+    @MonitorWith(SERVICEQUERY)
+    public Services getServices(@Context HttpServletRequest httpServletRequest, @Context UriInfo uriInfo, @PathParam("type") final String type)
     {
         return new Services(node.getEnvironment(), union(dynamicStore.get(type), staticStore.get(type)));
     }
 
     @GET
     @Produces(MediaType.APPLICATION_JSON)
-    public Services getServices()
+    @MonitorWith(SERVICEQUERY)
+    public Services getServices(@Context HttpServletRequest httpServletRequest, @Context UriInfo uriInfo)
     {
         return new Services(node.getEnvironment(), union(dynamicStore.getAll(), staticStore.getAll()));
     }

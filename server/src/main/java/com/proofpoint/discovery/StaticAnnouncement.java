@@ -15,6 +15,7 @@
  */
 package com.proofpoint.discovery;
 
+import com.google.common.base.Objects;
 import com.google.common.collect.ImmutableMap;
 import org.codehaus.jackson.annotate.JsonCreator;
 import org.codehaus.jackson.annotate.JsonProperty;
@@ -120,5 +121,17 @@ public class StaticAnnouncement
         result = 31 * result + (pool != null ? pool.hashCode() : 0);
         result = 31 * result + (properties != null ? properties.hashCode() : 0);
         return result;
+    }
+    
+    @Override
+    public String toString()
+    {
+        return Objects.toStringHelper(this.getClass())
+                .add("environment", environment)
+                .add("pool", pool)
+                .add("location", location)
+                .add("type", type)
+                .add("properties", properties)
+                .toString();
     }
 }

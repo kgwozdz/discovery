@@ -19,6 +19,7 @@ import com.google.common.base.Charsets;
 import com.google.common.base.Function;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
+import com.proofpoint.discovery.monitor.MonitorWith;
 import com.proofpoint.units.Duration;
 
 import javax.annotation.Nullable;
@@ -34,6 +35,9 @@ import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
 import java.util.List;
 import java.util.Map;
+
+import static com.proofpoint.discovery.monitor.DiscoveryEventType.STOREGET;
+import static com.proofpoint.discovery.monitor.DiscoveryEventType.STOREPUT;
 
 @Path("/v1/store/{store}")
 public class StoreResource
@@ -57,6 +61,7 @@ public class StoreResource
 
     @PUT
     @Path("{key}")
+    @MonitorWith(STOREPUT)
     public void put(@PathParam("store") String storeName, @PathParam("key") String key, byte[] value)
     {
         LocalStore store = localStores.get(storeName);
@@ -67,6 +72,7 @@ public class StoreResource
     
     @POST
     @Consumes({"application/x-jackson-smile", "application/json"})
+    @MonitorWith(STOREPUT)
     public Response setMultipleEntries(@PathParam("store") String storeName, List<Entry> entries)
     {
         LocalStore store = localStores.get(storeName);
@@ -85,6 +91,7 @@ public class StoreResource
 
     @GET
     @Produces({"application/x-jackson-smile", "application/json"})
+    @MonitorWith(STOREGET)
     public Response getAll(@PathParam("store") String storeName)
     {
         LocalStore store = localStores.get(storeName);

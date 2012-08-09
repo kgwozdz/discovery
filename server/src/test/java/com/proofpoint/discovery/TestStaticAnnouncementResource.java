@@ -17,14 +17,22 @@ package com.proofpoint.discovery;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import com.proofpoint.discovery.monitor.DiscoveryEvent;
+import com.proofpoint.discovery.monitor.DiscoveryEventType;
+import com.proofpoint.discovery.monitor.DiscoveryMonitor;
+import com.proofpoint.discovery.monitor.DiscoveryStats;
+import com.proofpoint.event.client.InMemoryEventClient;
 import com.proofpoint.jaxrs.testing.MockUriInfo;
 import com.proofpoint.node.NodeInfo;
+import org.mockito.Mockito;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
+import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.core.Response;
-import java.net.URI;
+import javax.ws.rs.core.UriInfo;
 
+import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
@@ -34,11 +42,15 @@ public class TestStaticAnnouncementResource
 {
     private InMemoryStaticStore store;
     private StaticAnnouncementResource resource;
+    private HttpServletRequest httpServletRequest;
+    private final UriInfo uriInfo = MockUriInfo.from("http://localhost:4111/v1/announcement/static");
 
     @BeforeMethod
     public void setup()
     {
         store = new InMemoryStaticStore();
+        httpServletRequest = Mockito.mock(HttpServletRequest.class);
+        when(httpServletRequest.getRemoteAddr()).thenReturn("127.0.0.1");
         resource = new StaticAnnouncementResource(store, new NodeInfo("testing"));
     }
 
@@ -47,7 +59,7 @@ public class TestStaticAnnouncementResource
     {
         StaticAnnouncement announcement = new StaticAnnouncement("testing", "storage", "alpha", "/a/b", ImmutableMap.of("http", "http://localhost:1111"));
 
-        Response response = resource.post(announcement, new MockUriInfo(URI.create("http://localhost:8080/v1/announcement/static")));
+        Response response = resource.post(httpServletRequest, uriInfo, announcement);
 
         assertNotNull(response);
         assertEquals(response.getStatus(), Response.Status.CREATED.getStatusCode());
@@ -68,7 +80,7 @@ public class TestStaticAnnouncementResource
     {
         StaticAnnouncement announcement = new StaticAnnouncement("production", "storage", "alpha", "/a/b/c", ImmutableMap.of("http", "http://localhost:1111"));
 
-        Response response = resource.post(announcement, new MockUriInfo(URI.create("http://localhost:8080/v1/announcement/static")));
+        Response response = resource.post(httpServletRequest, uriInfo, announcement);
 
         assertNotNull(response);
         assertEquals(response.getStatus(), Response.Status.BAD_REQUEST.getStatusCode());
@@ -85,7 +97,7 @@ public class TestStaticAnnouncementResource
         store.put(red);
         store.put(blue);
 
-        resource.delete(blue.getId());
+        resource.delete(httpServletRequest, uriInfo, blue.getId());
         assertEquals(store.getAll(), ImmutableSet.of(red));
     }
 
@@ -94,7 +106,7 @@ public class TestStaticAnnouncementResource
     {
         StaticAnnouncement announcement = new StaticAnnouncement("testing", "storage", "alpha", null, ImmutableMap.of("http", "http://localhost:1111"));
 
-        Response response = resource.post(announcement, new MockUriInfo(URI.create("http://localhost:8080/v1/announcement/")));
+        Response response = resource.post(httpServletRequest, uriInfo, announcement);
 
         assertNotNull(response);
         assertEquals(response.getStatus(), Response.Status.CREATED.getStatusCode());
@@ -114,7 +126,7 @@ public class TestStaticAnnouncementResource
         store.put(red);
         store.put(blue);
 
-        Services actual = resource.get();
+        Services actual = resource.get(httpServletRequest, uriInfo);
         Services expected = new Services("testing", ImmutableSet.of(red, blue));
 
         assertEquals(actual, expected);

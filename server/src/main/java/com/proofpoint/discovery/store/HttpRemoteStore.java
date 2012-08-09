@@ -23,6 +23,7 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.proofpoint.discovery.client.ServiceDescriptor;
 import com.proofpoint.discovery.client.ServiceSelector;
+import com.proofpoint.discovery.monitor.DiscoveryMonitor;
 import com.proofpoint.http.client.BodyGenerator;
 import com.proofpoint.http.client.HttpClient;
 import com.proofpoint.http.client.Request;
@@ -65,6 +66,7 @@ import static com.google.common.base.Predicates.not;
 import static com.google.common.collect.Iterables.filter;
 import static com.google.common.collect.Iterables.transform;
 import static com.google.inject.name.Names.named;
+import static com.proofpoint.discovery.monitor.DiscoveryEventType.REPLICATIONPUSH;
 import static org.weakref.jmx.ObjectNames.generatedNameOf;
 
 public class HttpRemoteStore
@@ -81,6 +83,7 @@ public class HttpRemoteStore
     private final NodeInfo node;
     private final ServiceSelector selector;
     private final HttpClient httpClient;
+    private final DiscoveryMonitor monitor;
 
     private Future<?> future;
     private ScheduledExecutorService executor;
@@ -95,6 +98,7 @@ public class HttpRemoteStore
             ServiceSelector selector,
             StoreConfig config,
             HttpClient httpClient,
+            DiscoveryMonitor monitor,
             MBeanExporter mbeanExporter)
     {
         Preconditions.checkNotNull(name, "name is null");
@@ -102,12 +106,14 @@ public class HttpRemoteStore
         Preconditions.checkNotNull(selector, "selector is null");
         Preconditions.checkNotNull(httpClient, "httpClient is null");
         Preconditions.checkNotNull(config, "config is null");
+        Preconditions.checkNotNull(monitor, "monitor is null");
         Preconditions.checkNotNull(mbeanExporter, "mBeanExporter is null");
 
         this.name = name;
         this.node = node;
         this.selector = selector;
         this.httpClient = httpClient;
+        this.monitor = monitor;
         this.mbeanExporter = mbeanExporter;
 
         maxBatchSize = config.getMaxBatchSize();
@@ -188,7 +194,7 @@ public class HttpRemoteStore
 
         for (ServiceDescriptor descriptor : newDescriptors) {
             BatchProcessor<Entry> processor = new BatchProcessor<Entry>(descriptor.getNodeId(),
-                    new MyBatchHandler(name, descriptor, httpClient),
+                    new MyBatchHandler(name, descriptor, httpClient, monitor),
                     maxBatchSize,
                     queueSize);
 
@@ -237,10 +243,12 @@ public class HttpRemoteStore
 
         private final URI uri;
         private final HttpClient httpClient;
+        private final DiscoveryMonitor monitor;
 
-        public MyBatchHandler(String name, ServiceDescriptor descriptor, HttpClient httpClient)
+        public MyBatchHandler(String name, ServiceDescriptor descriptor, HttpClient httpClient, DiscoveryMonitor monitor)
         {
             this.httpClient = httpClient;
+            this.monitor = monitor;
 
             // TODO: build URI from resource class
             uri = URI.create(descriptor.getProperties().get("http") + "/v1/store/" + name);
@@ -262,6 +270,8 @@ public class HttpRemoteStore
                     })
                     .build();
 
+            boolean success = true;
+            long startTime = System.nanoTime();
             try {
                 httpClient.execute(request, new ResponseHandler<Void, Exception>()
                 {
@@ -285,7 +295,12 @@ public class HttpRemoteStore
                 Thread.currentThread().interrupt();
             }
             catch (Exception e) {
+                success = false;
+                monitor.monitorDiscoveryFailureEvent(REPLICATIONPUSH, e, uri.toString());
                 // ignore
+            }
+            finally {
+                monitor.monitorDiscoveryEvent(REPLICATIONPUSH, success, null, uri.toString(), null, startTime);
             }
         }
     }

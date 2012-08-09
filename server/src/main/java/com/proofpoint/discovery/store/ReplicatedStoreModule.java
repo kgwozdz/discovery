@@ -20,10 +20,9 @@ import com.google.inject.Injector;
 import com.google.inject.Key;
 import com.google.inject.Module;
 import com.google.inject.Provider;
-import com.google.inject.Provides;
 import com.google.inject.Scopes;
-import com.google.inject.Singleton;
 import com.proofpoint.discovery.client.ServiceSelector;
+import com.proofpoint.discovery.monitor.DiscoveryMonitor;
 import com.proofpoint.http.client.HttpClient;
 import com.proofpoint.http.client.HttpClientModule;
 import com.proofpoint.node.NodeInfo;
@@ -32,7 +31,6 @@ import org.weakref.jmx.MBeanExporter;
 
 import javax.annotation.PreDestroy;
 import javax.inject.Inject;
-import javax.management.MBeanServer;
 import java.lang.annotation.Annotation;
 
 import static com.google.inject.multibindings.MapBinder.newMapBinder;
@@ -111,6 +109,7 @@ public class ReplicatedStoreModule
         private NodeInfo nodeInfo;
         private ServiceSelector serviceSelector;
         private Replicator replicator;
+        private DiscoveryMonitor monitor;
 
         private ReplicatorProvider(String name, Key<? extends LocalStore> localStoreKey, Key<? extends HttpClient> httpClientKey, Key<StoreConfig> storeConfigKey)
         {
@@ -128,7 +127,7 @@ public class ReplicatedStoreModule
                 HttpClient httpClient = injector.getInstance(httpClientKey);
                 StoreConfig storeConfig = injector.getInstance(storeConfigKey);
 
-                replicator = new Replicator(name, nodeInfo, serviceSelector, httpClient, localStore, storeConfig);
+                replicator = new Replicator(name, nodeInfo, serviceSelector, httpClient, localStore, storeConfig, monitor);
                 replicator.start();
             }
 
@@ -160,6 +159,12 @@ public class ReplicatedStoreModule
         {
             this.serviceSelector = serviceSelector;
         }
+
+        @Inject
+        public void setMonitor(DiscoveryMonitor monitor)
+        {
+            this.monitor = monitor;
+        }
     }
 
     private static class RemoteHttpStoreProvider
@@ -169,6 +174,7 @@ public class ReplicatedStoreModule
         private Injector injector;
         private NodeInfo nodeInfo;
         private ServiceSelector serviceSelector;
+        private DiscoveryMonitor monitor;
         private MBeanExporter mbeanExporter;
 
         private final String name;
@@ -190,7 +196,7 @@ public class ReplicatedStoreModule
                 HttpClient httpClient = injector.getInstance(httpClientKey);
                 StoreConfig storeConfig = injector.getInstance(storeConfigKey);
 
-                remoteStore = new HttpRemoteStore(name, nodeInfo, serviceSelector, storeConfig, httpClient, mbeanExporter);
+                remoteStore = new HttpRemoteStore(name, nodeInfo, serviceSelector, storeConfig, httpClient, monitor, mbeanExporter);
                 remoteStore.start();
             }
 
@@ -221,6 +227,12 @@ public class ReplicatedStoreModule
         public void setServiceSelector(ServiceSelector serviceSelector)
         {
             this.serviceSelector = serviceSelector;
+        }
+
+        @Inject
+        public void setMonitor(DiscoveryMonitor monitor)
+        {
+            this.monitor = monitor;
         }
 
         @Inject

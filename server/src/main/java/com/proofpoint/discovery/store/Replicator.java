@@ -18,6 +18,7 @@ package com.proofpoint.discovery.store;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.proofpoint.discovery.client.ServiceDescriptor;
 import com.proofpoint.discovery.client.ServiceSelector;
+import com.proofpoint.discovery.monitor.DiscoveryMonitor;
 import com.proofpoint.http.client.HttpClient;
 import com.proofpoint.http.client.Request;
 import com.proofpoint.http.client.RequestBuilder;
@@ -43,6 +44,8 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
+import static com.proofpoint.discovery.monitor.DiscoveryEventType.REPLICATIONPULL;
+
 public class Replicator
 {
     private final static Logger log = Logger.get(Replicator.class);
@@ -52,6 +55,7 @@ public class Replicator
     private final ServiceSelector selector;
     private final HttpClient httpClient;
     private final LocalStore localStore;
+    private final DiscoveryMonitor monitor;
     private final Duration replicationInterval;
 
     private ScheduledFuture<?> future;
@@ -66,13 +70,15 @@ public class Replicator
             ServiceSelector selector,
             HttpClient httpClient,
             LocalStore localStore,
-            StoreConfig config)
+            StoreConfig config,
+            DiscoveryMonitor monitor)
     {
         this.name = name;
         this.node = node;
         this.selector = selector;
         this.httpClient = httpClient;
         this.localStore = localStore;
+        this.monitor = monitor;
 
         this.replicationInterval = config.getReplicationInterval();
 
@@ -128,17 +134,20 @@ public class Replicator
                 continue;
             }
 
-            String uri = descriptor.getProperties().get("http");
-            if (uri == null) {
-                log.error("service descriptor for node %s is missing http uri", descriptor.getNodeId());
+            String baseUri = descriptor.getProperties().get("http");
+            if (baseUri == null) {
+                log.error("service descriptor for node %s is missing http baseUri", descriptor.getNodeId());
                 continue;
             }
 
             // TODO: build URI from resource class
+            URI uri = URI.create(baseUri + "/v1/store/" + name);
             Request request = RequestBuilder.prepareGet()
-                    .setUri(URI.create(uri + "/v1/store/" + name))
+                    .setUri(uri)
                     .build();
 
+            boolean success = true;
+            long startTime = System.nanoTime();
             try {
                 httpClient.execute(request, new ResponseHandler<Void, Exception>()
                 {
@@ -175,7 +184,12 @@ public class Replicator
                 Thread.currentThread().interrupt();
             }
             catch (Exception e) {
+                success = false;
+                monitor.monitorDiscoveryFailureEvent(REPLICATIONPULL, e, uri.toString());
                 // ignore
+            }
+            finally {
+                monitor.monitorDiscoveryEvent(REPLICATIONPULL, success, null, uri.toString(), null, startTime);
             }
         }
 

@@ -16,9 +16,11 @@
 package com.proofpoint.discovery;
 
 import com.google.common.base.Objects;
+import com.proofpoint.discovery.monitor.MonitorWith;
 import com.proofpoint.node.NodeInfo;
 
 import javax.inject.Inject;
+import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.GET;
@@ -32,6 +34,9 @@ import javax.ws.rs.core.UriBuilder;
 import javax.ws.rs.core.UriInfo;
 import java.net.URI;
 
+import static com.proofpoint.discovery.monitor.DiscoveryEventType.STATICANNOUNCEMENT;
+import static com.proofpoint.discovery.monitor.DiscoveryEventType.STATICANNOUNCEMENTDELETE;
+import static com.proofpoint.discovery.monitor.DiscoveryEventType.STATICANNOUNCEMENTLIST;
 import static java.lang.String.format;
 import static javax.ws.rs.core.Response.Status.BAD_REQUEST;
 
@@ -50,7 +55,8 @@ public class StaticAnnouncementResource
 
     @POST
     @Consumes("application/json")
-    public Response post(StaticAnnouncement announcement, @Context UriInfo uriInfo)
+    @MonitorWith(STATICANNOUNCEMENT)
+    public Response post(@Context HttpServletRequest httpServletRequest, @Context final UriInfo uriInfo, final StaticAnnouncement announcement)
     {
         if (!nodeInfo.getEnvironment().equals(announcement.getEnvironment())) {
             return Response.status(BAD_REQUEST)
@@ -62,9 +68,9 @@ public class StaticAnnouncementResource
         String location = Objects.firstNonNull(announcement.getLocation(), "/somewhere/" + id);
 
         Service service = Service.copyOf(announcement)
-                    .setId(id)
-                    .setLocation(location)
-                    .build();
+                .setId(id)
+                .setLocation(location)
+                .build();
 
         store.put(service);
 
@@ -74,15 +80,18 @@ public class StaticAnnouncementResource
 
     @GET
     @Produces("application/json")
-    public Services get()
+    @MonitorWith(STATICANNOUNCEMENTLIST)
+    public Services get(@Context HttpServletRequest httpServletRequest, @Context UriInfo uriInfo)
     {
         return new Services(nodeInfo.getEnvironment(), store.getAll());
     }
 
     @DELETE
     @Path("{id}")
-    public void delete(@PathParam("id") Id<Service> id)
+    @MonitorWith(STATICANNOUNCEMENTDELETE)
+    public void delete(@Context HttpServletRequest httpServletRequest, @Context UriInfo uriInfo, @PathParam("id") final Id<Service> id)
     {
         store.delete(id);
     }
+
 }

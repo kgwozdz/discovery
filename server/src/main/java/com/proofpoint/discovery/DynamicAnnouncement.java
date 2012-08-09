@@ -15,6 +15,7 @@
  */
 package com.proofpoint.discovery;
 
+import com.google.common.base.Objects;
 import com.google.common.collect.ImmutableSet;
 import org.codehaus.jackson.annotate.JsonCreator;
 import org.codehaus.jackson.annotate.JsonProperty;
@@ -113,17 +114,6 @@ public class DynamicAnnouncement
         return result;
     }
 
-    @Override
-    public String toString()
-    {
-        return "DynamicAnnouncement{" +
-                "environment='" + environment + '\'' +
-                ", location='" + location + '\'' +
-                ", pool='" + pool + '\'' +
-                ", services=" + services +
-                '}';
-    }
-
     public static Builder copyOf(DynamicAnnouncement announcement)
     {
         return new Builder().copyOf(announcement);
@@ -156,5 +146,16 @@ public class DynamicAnnouncement
         {
             return new DynamicAnnouncement(environment, pool, location, services);
         }
+    }
+
+    @Override
+    public String toString()
+    {
+        return Objects.toStringHelper(this.getClass())
+                .add("environment", environment)
+                .add("pool", pool)
+                .add("location", location)
+                .add("services", services)
+                .toString();
     }
 }
